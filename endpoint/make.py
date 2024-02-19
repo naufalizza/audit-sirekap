@@ -38,7 +38,7 @@ TPS data example:
     ]
 }
 """
-ENDPOINT_PATTERN = r"https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp/(\d+)/(\d+)/(\d+)/(\d+)/(\d+).json"
+ENDPOINT_PATTERN = r"https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp/(\d{2})/(\d{2}[0-9A-Z]{2})/(\d{2}[0-9A-Z]{2}\d{2})/(\d{2}[0-9A-Z]{2}\d{6})/(\d{2}[0-9A-Z]{2}\d{9}).json"
 
 def sirekap_endpoint_to_kpu_endpoint(sirekap_endpoint):
     match_result = re.match(ENDPOINT_PATTERN, sirekap_endpoint)
@@ -128,7 +128,5 @@ with open(raw_invalid_path) as fp:
         reason_list = json_data["reason"]
 
         make_data(all_data, timestamp, url, reason_list, [prov_id, kota_id, kec_id, kel_id, tps_id])
-        if all_data["summary"]["count"] >= 10:
-            break
 
 make_file(invalid_data_folder_path, all_data)
