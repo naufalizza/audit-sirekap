@@ -1,6 +1,7 @@
 import os
 import json
 from fetch import fetch_procedure
+from update import update_procedure
 from validation import validation_procedure
 
 def get_next_url_list(update_folder_path):
@@ -71,6 +72,7 @@ if __name__ == "__main__":
         else:
             fetch_procedure(urls, update_folder_path, num_fetch_threads)
             validation_procedure(update_folder_path)
+            update_procedure(update_folder_path)
             
             count += 1
             if count >= 5:

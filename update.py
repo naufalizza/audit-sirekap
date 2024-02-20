@@ -1,10 +1,8 @@
 import json
 import os
 import re
-import sys
-
-raw_invalid_path = sys.argv[1]
-invalid_data_folder_path = sys.argv[2]
+import shutil
+import time
 
 """
 Temporary data format:
@@ -39,6 +37,7 @@ TPS data example:
 }
 """
 ENDPOINT_PATTERN = r"https://sirekap-obj-data.kpu.go.id/pemilu/hhcw/ppwp/(\d{2})/(\d{2}[0-9A-Z]{2})/(\d{2}[0-9A-Z]{2}\d{2})/(\d{2}[0-9A-Z]{2}\d{6})/(\d{2}[0-9A-Z]{2}\d{9}).json"
+DEFAULT_TIMESTAMP = 1708211880
 
 def sirekap_endpoint_to_kpu_endpoint(sirekap_endpoint):
     match_result = re.match(ENDPOINT_PATTERN, sirekap_endpoint)
@@ -53,8 +52,6 @@ def sirekap_endpoint_to_kpu_endpoint(sirekap_endpoint):
 
     return f"http://pemilu2024.kpu.go.id/pilpres/hitung-suara/{prov_id}/{kota_id}/{kec_id}/{kel_id}/{tps_id}"
 
-all_data = {}
-DEFAULT_TIMESTAMP = 1708211880
 def make_data(data, timestamp, sirekap_endpoint, reason_list, id_list):
     if len(id_list) == 0:
         data["timestamp"] = timestamp
@@ -109,24 +106,33 @@ def make_file(folder_path, data):
             with open(f"{folder_path}/{child_id}.json", mode="w") as fp:
                 json.dump(child_data, fp)
 
-with open(raw_invalid_path) as fp:
-    for line in fp:
-        json_data = json.loads(line)
-        timestamp = json_data.get("timestamp", DEFAULT_TIMESTAMP)
-        url = json_data["url"]
-        match_result = re.match(ENDPOINT_PATTERN, url)
-        if match_result is None:
-            print(f"Warning: URL {url} is ignored because of unexpected format")
-            continue
+def update_procedure(update_folder_path):
+    raw_invalid_path = f"{update_folder_path}/invalid.jsonl"
+    invalid_data_folder_path = f"{update_folder_path}/invalid"
+    all_data = {}
+    with open(raw_invalid_path) as fp:
+        for line in fp:
+            json_data = json.loads(line)
+            timestamp = json_data.get("timestamp", DEFAULT_TIMESTAMP)
+            url = json_data["url"]
+            match_result = re.match(ENDPOINT_PATTERN, url)
+            if match_result is None:
+                print(f"Warning: URL {url} is ignored because of unexpected format")
+                continue
         
-        prov_id = match_result.group(1)
-        kota_id = match_result.group(2)
-        kec_id = match_result.group(3)
-        kel_id = match_result.group(4)
-        tps_id = match_result.group(5)
+            prov_id = match_result.group(1)
+            kota_id = match_result.group(2)
+            kec_id = match_result.group(3)
+            kel_id = match_result.group(4)
+            tps_id = match_result.group(5)
 
-        reason_list = json_data["reason"]
+            reason_list = json_data["reason"]
 
-        make_data(all_data, timestamp, url, reason_list, [prov_id, kota_id, kec_id, kel_id, tps_id])
+            make_data(all_data, timestamp, url, reason_list, [prov_id, kota_id, kec_id, kel_id, tps_id])
 
-make_file(invalid_data_folder_path, all_data)
+        if len(all_data) == 0:
+            all_data = {"timestamp": int(time.time() // 1), "summary": { "count": 0, "reason": {}}, "data": {}}
+
+    if os.path.exists(invalid_data_folder_path):
+        shutil.rmtree(invalid_data_folder_path)
+    make_file(invalid_data_folder_path, all_data)
