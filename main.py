@@ -24,8 +24,6 @@ def make_first_next_url_list():
     # This is only used for the first time.
     input_dict = load_data("data")
     urls = extract_urls_from_dict(input_dict)
-    print("Warning: for testing, we just take first 50 data.")
-    urls = urls[:50]
     return urls
 
 def load_data(data_dir: str):
@@ -63,7 +61,6 @@ if __name__ == "__main__":
     update_folder_path = sys.argv[1]
     num_fetch_threads = int(sys.argv[2])
 
-    count = 0
     stop = False
     while not stop:
         urls = get_next_url_list(update_folder_path)
@@ -73,8 +70,3 @@ if __name__ == "__main__":
             fetch_procedure(urls, update_folder_path, num_fetch_threads)
             validation_procedure(update_folder_path)
             update_procedure(update_folder_path)
-            
-            count += 1
-            if count >= 5:
-                print("Early break just for test")
-                break

@@ -36,9 +36,16 @@ def get_400_response():
 def get_404_response():
     return JSONResponse(status_code=404, content={"message": f"Data not found"})
 
-@app.get("/invalid-endpoints", response_model=NonTpsInvalidInfo)
+def get_503_response():
+    return JSONResponse(status_code=503, content={"message": f"Service unavailable"})
+
+@app.get("/invalid-endpoints", response_model=NonTpsInvalidInfo, responses={503: {"model": ErrorMessage}})
 def get_indonesia_invalid_info():
-    with open(f"{invalid_data_folder_path}/all.json") as fp:
+    path = f"{invalid_data_folder_path}/all.json"
+    if not os.path.isfile(path):
+        return get_503_response()
+    
+    with open(path) as fp:
         data = fp.read()
     return Response(content=data, media_type="application/json")
 
