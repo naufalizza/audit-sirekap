@@ -1,56 +1,78 @@
-import sys
+import os
 import json
-from validation import get_validation_result
+from fetch import fetch_procedure
+from validation import validation_procedure
 
-input_path = sys.argv[1]
-incomplete_path = sys.argv[2]
-invalid_path = sys.argv[3]
-next_url_path = sys.argv[4]
-
-count = 0
-incomplete_count = 0
-invalid_count = 0
-next_url_count = 0
-with (
-        open(input_path) as input_fp,
-        open(incomplete_path, mode="w") as incomplete_fp,
-        open(invalid_path, mode="w") as invalid_fp,
-        open(next_url_path, mode="w") as next_url_fp,
-):
-    for line in input_fp:
-        if not line.startswith("{\"url\":"):
-            raise ValueError(f"Unexpected line: {line}")
+def get_next_url_list(update_folder_path):
+    urls = []
+    next_url_path = f"{update_folder_path}/next_url.txt"
+    if os.path.exists(next_url_path):
+        with open(next_url_path) as fp:
+            for line in fp:
+                urls.append(line.strip())
+    else:
+        print(f"{next_url_path} doesn't exists. All URLs are taken.")
+        urls = make_first_next_url_list()
+        with open(next_url_path, mode="w") as fp:
+            for url in urls:
+                print(url, file=fp)
         
-        count += 1
+    return urls
 
-        json_data = json.loads(line)
-        url = json_data["url"]
-        data = json_data["data"]
-        validation_result = get_validation_result(data)
-        status = validation_result["status"]
-        if status == "valid":
-            continue
+def make_first_next_url_list():
+    # This is only used for the first time.
+    input_dict = load_data("data")
+    urls = extract_urls_from_dict(input_dict)
+    print("Warning: for testing, we just take first 50 data.")
+    urls = urls[:50]
+    return urls
 
-        json_data["reason"] = validation_result["reason"]
-        dumped_json_data = json.dumps(json_data)
-        if status == "incomplete":
-            print(dumped_json_data, file=incomplete_fp)
-            incomplete_count += 1
+def load_data(data_dir: str):
+    provinces_filename = os.listdir(data_dir)
+    print("jumlah provinsi + 1 (dari luar negeri):", len(provinces_filename))
+    validated_provinces_data = {}
+    for province_filename in provinces_filename:
+        province_name = ".".join(province_filename.split(".")[:-1])
+        with open(os.path.join(data_dir, province_filename), "r") as f:
+            province_data = json.load(f)
+        validated_provinces_data[province_name] = province_data
+    return validated_provinces_data
 
-            print(url, file=next_url_fp)
-            next_url_count += 1
+def extract_urls_from_dict(input_dict):
+    url_list = []
 
-        elif status == "invalid":
-            print(dumped_json_data, file=invalid_fp)
-            invalid_count += 1
+    def extract_urls(data):
+        if isinstance(data, str):
+            # Check if the string is a URL
+            if data.startswith("http://") or data.startswith("https://"):
+                data = data.replace("/wilayah/pemilu/ppwp", "/pemilu/hhcw/ppwp")
+                url_list.append(data)
+        elif isinstance(data, dict):
+            for value in data.values():
+                extract_urls(value)
+        elif isinstance(data, (list, tuple)):
+            for item in data:
+                extract_urls(item)
 
-            print(url, file=next_url_fp)
-            next_url_count += 1
+    extract_urls(input_dict)
+    return url_list
 
+if __name__ == "__main__":
+    import sys
+    update_folder_path = sys.argv[1]
+    num_fetch_threads = int(sys.argv[2])
+
+    count = 0
+    stop = False
+    while not stop:
+        urls = get_next_url_list(update_folder_path)
+        if len(urls) == 0:
+            stop = True
         else:
-            raise ValueError(f"Unexpected status: {status}")
-
-print(f"{count=}")
-print(f"{incomplete_count=}")
-print(f"{invalid_count=}")
-print(f"{next_url_count=}")
+            fetch_procedure(urls, update_folder_path, num_fetch_threads)
+            validation_procedure(update_folder_path)
+            
+            count += 1
+            if count >= 5:
+                print("Early break just for test")
+                break

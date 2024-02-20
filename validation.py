@@ -1,3 +1,5 @@
+import json
+
 REQUIRED_ADMINISTRASI_ATTRIBUTE_PREFIX_WITH_SPECIFIC_GENDER = [
     "pengguna_dpt_",
     "pengguna_dptb_",
@@ -171,10 +173,54 @@ def get_reasons_from_jumlah_seluruh_suara_sah_dan_tidak_sah_lebih_dari_jumlah_pe
             "Jumlah seluruh suara sah dan tidak sah lebih dari jumlah pengguna hak pilih.",
             f"Jumlah seluruh suara sah dan tidak sah bernilai {jumlah_seluruh_suara_sah_dan_tidak_sah}, sedangkan jumlah pengguna hak pilih adalah {jumlah_pengguna_hak_pilih}."
         )]
+    
+def validation_procedure(update_folder_path):
+    input_path = f"{update_folder_path}/all_tps_data.jsonl"
+    incomplete_path = f"{update_folder_path}/incomplete.jsonl"
+    invalid_path = f"{update_folder_path}/invalid.jsonl"
+    next_url_path = f"{update_folder_path}/next_url.txt"
 
-if __name__ == "__main__":
-    import json
-    raw_data = """{"mode": "hhcw", "chart": {"null": null, "100025": 44, "100026": 78, "100027": 18}, "images": ["https://sirekap-obj-formc.kpu.go.id/e768/pemilu/ppwp/17/01/08/20/01/1701082001002-20240216-161218--44560751-2bda-4951-977a-219e12177251.jpg", "https://sirekap-obj-formc.kpu.go.id/e768/pemilu/ppwp/17/01/08/20/01/1701082001002-20240216-163322--68eec787-d5b2-4702-9be2-0ce9ba529532.jpg", "https://sirekap-obj-formc.kpu.go.id/e768/pemilu/ppwp/17/01/08/20/01/1701082001002-20240216-162409--16a9177f-95bc-47d3-bdde-fd40246fa711.jpg"], "administrasi": {"suara_sah": 140, "suara_total": 140, "pemilih_dpt_j": 174, "pemilih_dpt_l": 88, "pemilih_dpt_p": 86, "pengguna_dpt_j": 137, "pengguna_dpt_l": 63, "pengguna_dpt_p": 74, "pengguna_dptb_j": 3, "pengguna_dptb_l": 2, "pengguna_dptb_p": 1, "suara_tidak_sah": 0, "pengguna_total_j": 140, "pengguna_total_l": 65, "pengguna_total_p": 75, "pengguna_non_dpt_j": 0, "pengguna_non_dpt_l": 0, "pengguna_non_dpt_p": 0}, "psu": null, "ts": "2024-02-16 23:00:00", "status_suara": true, "status_adm": true}"""
-    data = json.loads(raw_data)
-    result = get_validation_result(data)
-    print(result)
+    count = 0
+    incomplete_count = 0
+    invalid_count = 0
+    next_url_count = 0
+    with (
+            open(input_path) as input_fp,
+            open(incomplete_path, mode="w+") as incomplete_fp,
+            open(invalid_path, mode="w+") as invalid_fp,
+            open(next_url_path, mode="w+") as next_url_fp,
+    ):
+        for line in input_fp:
+            if not line.startswith("{\"url\":"):
+                raise ValueError(f"Unexpected line: {line}")
+        
+            count += 1
+
+            json_data = json.loads(line)
+            url = json_data["url"]
+            data = json_data["data"]
+            validation_result = get_validation_result(data)
+            status = validation_result["status"]
+            if status == "valid":
+                continue
+
+            json_data["reason"] = validation_result["reason"]
+            dumped_json_data = json.dumps(json_data)
+            if status == "incomplete":
+                print(dumped_json_data, file=incomplete_fp)
+                incomplete_count += 1
+
+                print(url, file=next_url_fp)
+                next_url_count += 1
+
+            elif status == "invalid":
+                print(dumped_json_data, file=invalid_fp)
+                invalid_count += 1
+
+                print(url, file=next_url_fp)
+                next_url_count += 1
+
+            else:
+                raise ValueError(f"Unexpected status: {status}")
+
+    print(f"validation result: {count=};{incomplete_count=};{invalid_count=};{next_url_count=}")
