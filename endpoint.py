@@ -1,5 +1,6 @@
 import sys
-invalid_data_folder_path = sys.argv[1]
+update_folder_path = sys.argv[1]
+invalid_data_folder_path = f"{update_folder_path}/invalid"
 
 from fastapi import FastAPI
 from fastapi.responses import Response, JSONResponse
