@@ -15,7 +15,7 @@ async def fetch_and_save_data(url: str, output_path: str, error_log_path: str):
 
     except Exception as e:
         with open(error_log_path, "a") as fp:
-            print(f"{timestamp} | Warning: Cannot fetching result from {url}. Error info: {repr(e)}")
+            print(f"{timestamp} | Warning: Cannot fetching result from {url}. Error info: {repr(e)}", file=fp)
         result = None
 
     data = {
@@ -49,18 +49,30 @@ async def main(urls: list[str], output_folder_path: str, num_threads: int):
     result_count = 0
     success_count = 0
     failed_count = 0
-    for i in tqdm(range(0, len(urls), num_threads)):
-        results = await fetch_and_save_multiple(urls[i:i+num_threads], output_path, error_log_path)
-        for _, r in results:
-            result_count += 1
-            if r is not None:
-                success_count += 1
-            else:
-                failed_count += 1
-            
-    duration_seconds = time.time()-main_start_time
-    print(f"fetch result: {duration_seconds=:.2f};{result_count=};{success_count=};{failed_count=}")
+    try:
+        for i in tqdm(range(0, len(urls), num_threads)):
+            results = await fetch_and_save_multiple(urls[i:i+num_threads], output_path, error_log_path)
+            for _, r in results:
+                result_count += 1
+                if r is not None:
+                    success_count += 1
+                else:
+                    failed_count += 1
+    except asyncio.exceptions.CancelledError as e:
+        print("Cancelled. Old data will be used back.")
+        interrupted_output_path = f"{output_folder_path}/interrupted_all_tps_data.jsonl"
+        if os.path.exists(output_path):
+            shutil.move(output_path, interrupted_output_path)
+
+        old_output_path = f"{output_folder_path}/old_all_tps_data.jsonl"
+        if os.path.exists(old_output_path):
+            shutil.move(old_output_path, output_path)
+
+        raise e
+    
+    finally:
+        duration_seconds = time.time()-main_start_time
+        print(f"fetch result: {duration_seconds=:.2f};{result_count=};{success_count=};{failed_count=}")
 
 def fetch_procedure(urls, update_folder_path, num_threads):
     asyncio.run(main(urls, update_folder_path, num_threads))
-

@@ -67,6 +67,10 @@ if __name__ == "__main__":
         if len(urls) == 0:
             stop = True
         else:
-            fetch_procedure(urls, update_folder_path, num_fetch_threads)
-            validation_procedure(update_folder_path)
-            update_procedure(update_folder_path)
+            try:
+                fetch_procedure(urls, update_folder_path, num_fetch_threads)
+                validation_procedure(update_folder_path)
+                update_procedure(update_folder_path)
+            except KeyboardInterrupt:
+                print("Keyboard interruption detected.")
+                stop = True
